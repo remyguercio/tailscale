@@ -1,0 +1,106 @@
+# Test Migration TODO List
+# Tests that need to be migrated from legacy/ to the new app structure
+
+## Status Legend:
+# ✅ = Migrated
+# ❌ = Not migrated
+# 🔄 = Partially migrated (some functionality covered in new tests)
+
+## Tests from legacy/tsidp_test.go (20 tests total)
+
+### Client Management Tests
+✅ TestBackwardCompatibility - Tests backward compatibility for client registration fields (migrated to server/client_test.go)
+✅ TestServeDynamicClientRegistration - Tests dynamic client registration endpoint (migrated to server/client_test.go)
+✅ TestRedirectURIValidation - Tests redirect URI validation logic (migrated to server/client_test.go)
+
+### Metadata Endpoint Tests
+✅ TestMetadataEndpoints - Tests OpenID/OAuth metadata endpoints (migrated to server/handlers_test.go)
+✅ TestOAuthMetadataRefreshTokenSupport - Tests refresh token in OAuth metadata (migrated to server/handlers_test.go)
+✅ TestPKCEMetadata - Tests PKCE in metadata endpoints (migrated to server/handlers_test.go)
+
+### Token Endpoint Tests
+✅ TestRefreshTokenFlow - Tests refresh token grant flow (migrated to server/token_test.go)
+✅ TestTokenEndpointUnsupportedGrantType - Tests unsupported grant type handling (migrated to server/token_test.go)
+✅ TestTokenExpiration - Tests token expiration handling (migrated to server/token_test.go)
+✅ TestRefreshTokenWithResources - Tests refresh tokens with resource downscoping (RFC 8707) (migrated to server/token_test.go)
+✅ TestRefreshTokenScopePreservation - Tests scope preservation in refresh tokens (migrated to server/token_test.go)
+✅ TestAZPClaimWithMultipleAudiences - Tests azp claim handling with multiple audiences (migrated to server/token_test.go)
+
+### Investigation Items
+✅ **SECURITY FIXED**: Server implementation now properly validates client credentials in refresh token flow - Both legacy and server correctly reject with 401/invalid_client. 
+
+**Root Cause**: The `allowRelyingParty` method in `server/token.go:936-941` was a stub that always returned `nil`, allowing any client to use any refresh token.
+
+**Fix Applied**: 
+- Implemented proper `allowRelyingParty` method with client credential validation (server/token.go:936-972)
+- Added funnel client credential validation using constant-time comparison
+- Added local client loopback address validation  
+- Added node client identity validation via WhoIs
+- Added nil local client checks with proper error handling
+- Fixed test in `server/authorize_test.go:80` to properly set FunnelRP for funnel clients
+- Updated security test in `server/token_test.go:553-572` to expect correct 401/invalid_client behavior
+
+**Security Impact**: OAuth 2.0 refresh token security now properly enforced - only the original client can use its refresh tokens.
+
+### Token Introspection Tests
+✅ TestIntrospectTokenExpiration - Tests introspection of expired tokens (migrated to server/token_test.go)
+✅ TestIntrospectWithResources - Tests introspection with resources (migrated to server/token_test.go)
+✅ TestIntrospectionRFC7662Compliance - Tests RFC 7662 compliance (migrated to server/token_test.go)
+
+### Resource Indicators Tests (RFC 8707)
+✅ TestResourceIndicators - Tests RFC 8707 resource indicators support (migrated to server/token_test.go)
+
+### PKCE Tests (RFC 7636)
+✅ TestPKCE - Tests PKCE implementation (migrated to server/authorize_test.go)
+✅ TestPKCEWithRefreshToken - Tests PKCE with refresh tokens (migrated to server/authorize_test.go)
+
+### Scope Tests
+✅ TestScopeHandling - Tests OAuth scope handling (migrated to server/authorize_test.go)
+
+### Cleanup Tests
+✅ TestCleanupExpiredTokens - Tests expired token cleanup (enhanced version in server/server_test.go covers both legacy tests)
+
+## Tests from legacy/ui_test.go (2 tests total)
+
+### URI Helper Tests
+✅ TestSplitRedirectURIs - Tests splitting redirect URIs string into array (migrated to server/client_test.go)
+✅ TestJoinRedirectURIs - Tests joining redirect URI array into string (migrated to server/client_test.go)
+
+## Summary Statistics
+- Total tests in legacy: 22
+- Migrated: 22 (100%)
+- Partially migrated: 0 (0%)
+- Not migrated: 0 (0%)
+
+## Migration Priority (Recommended Order)
+
+### High Priority (Core OAuth/OIDC functionality)
+1. TestServeDynamicClientRegistration - Critical for client registration
+2. TestRefreshTokenFlow - Critical for token lifecycle
+3. TestTokenEndpointUnsupportedGrantType - Important for security
+4. TestPKCE - Important for public client security
+5. TestIntrospectionRFC7662Compliance - Token introspection compliance
+
+### Medium Priority (Standards compliance)
+6. TestResourceIndicators - RFC 8707 support
+7. TestRefreshTokenWithResources - Resource downscoping
+8. TestAZPClaimWithMultipleAudiences - Multi-audience support
+9. TestScopeHandling - OAuth scope handling
+10. TestIntrospectWithResources - Introspection with resources
+
+### Low Priority (Helper functions and edge cases)
+11. TestBackwardCompatibility - Client field compatibility
+12. TestRedirectURIValidation - URI validation logic
+13. TestTokenExpiration - Token expiration edge cases
+14. TestIntrospectTokenExpiration - Introspection expiration edge cases
+15. TestRefreshTokenScopePreservation - Scope preservation details
+16. TestPKCEWithRefreshToken - PKCE refresh token interaction
+17. TestCleanupExpiredTokens - Token cleanup (upgrade existing test)
+18. TestSplitRedirectURIs - Helper function
+19. TestJoinRedirectURIs - Helper function
+
+## Notes
+- Some tests may need to be split across multiple packages (e.g., token tests in token_test.go, client tests in client_test.go)
+- Consider creating integration tests for end-to-end flows
+- Some legacy tests may be redundant with the new structure and can be consolidated
+- Tests should be updated to use the new IDPServer struct and its methods directly
